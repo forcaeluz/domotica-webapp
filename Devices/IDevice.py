@@ -25,3 +25,15 @@ class IDevice:
 
     def get_input(self, name):
         pass
+
+    def add_input(self, device_input):
+        pass
+
+    def remove_input(self, name):
+        pass
+
+    def add_output(self, output):
+        pass
+
+    def remove_output(self, name):
+        pass
