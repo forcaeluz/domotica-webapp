@@ -2,6 +2,7 @@ class Crc8Calculator:
     def __init__(self, polynomial):
         self.__polynomial = polynomial
         self.__CRC_TABLE = bytearray(256)
+        self.__fill_crc_table()
 
     def compute_crc(self, message):
         crc = 0
