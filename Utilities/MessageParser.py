@@ -23,7 +23,7 @@ class MessageParser:
         msg['type'] = self.__get_message_type_string(data[1])
         if msg['type'] == 'string':
             msg['id'] = data[2]
-            msg['data'] = data[3:9].decode()
+            msg['data'] = data[3:9]
         else:
             msg['id'] = data[2]
             msg['address'] = data[3]
