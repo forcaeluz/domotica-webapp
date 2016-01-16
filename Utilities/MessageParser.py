@@ -5,25 +5,6 @@ from binascii import hexlify
 
 class MessageParser:
 
-    COMMAND_MESSAGE = 0x00
-    REQUEST_MESSAGE = 0x01
-    REPLY_MESSAGE = 0x02
-    HEART_BEAT_MESSAGE = 0x03
-    UPDATE_MESSAGE = 0x04
-    STRING_MESSAGE = 0x05
-    ERROR_MESSAGE = 0x06
-
-    CRC_POLYNOMIAL = 0x97
-
-    __MESSAGE_SIZES = {
-        'string': 12,
-        'reply': 10,
-        'error': 6,
-        'update': 10,
-        'heart_beat': 6,
-        'command': 10
-    }
-
     def __init__(self):
         self.__crc_checker = Crc8Calculator(self.CRC_POLYNOMIAL)
         self.app_logger = getLogger('application.message_parser')
@@ -70,6 +51,16 @@ class MessageParser:
         data[5] = self.__crc_checker.compute_crc(data[0:5])
         return data
 
+    def get_message_size(self, message_header):
+        assert isinstance(message_header, bytearray), 'Incoming data is not a bytearray'
+        assert message_header[0] == 0xFF, 'Invalid message header'
+        self.app_logger.debug('Determining type and size for header: %s' % hexlify(message_header))
+        self.app_logger.debug(message_header)
+        msg_type = self.__get_message_type_string(message_header[1])
+        size = self.__MESSAGE_SIZES[msg_type]
+        self.app_logger.debug("Determined message type and size: %s, %d" % (msg_type, size))
+        return size
+
     def __get_message_type_string(self, type_number):
         return_value = ''
         if type_number == self.COMMAND_MESSAGE:
@@ -84,12 +75,21 @@ class MessageParser:
             return_value = 'error'
         return return_value
 
-    def get_message_size(self, message_header):
-        assert isinstance(message_header, bytearray), 'Incoming data is not a bytearray'
-        assert message_header[0] == 0xFF, 'Invalid message header'
-        self.app_logger.debug('Determining type and size for header: %s' % hexlify(message_header))
-        self.app_logger.debug(message_header)
-        msg_type = self.__get_message_type_string(message_header[1])
-        size = self.__MESSAGE_SIZES[msg_type]
-        self.app_logger.debug("Determined message type and size: %s, %d" % (msg_type, size))
-        return size
+    COMMAND_MESSAGE = 0x00
+    REQUEST_MESSAGE = 0x01
+    REPLY_MESSAGE = 0x02
+    HEART_BEAT_MESSAGE = 0x03
+    UPDATE_MESSAGE = 0x04
+    STRING_MESSAGE = 0x05
+    ERROR_MESSAGE = 0x06
+
+    CRC_POLYNOMIAL = 0x97
+
+    __MESSAGE_SIZES = {
+        'string': 12,
+        'reply': 10,
+        'error': 6,
+        'update': 10,
+        'heart_beat': 6,
+        'command': 10
+    }
