@@ -7,7 +7,7 @@ class MessageParser:
 
     def __init__(self):
         self.__crc_checker = Crc8Calculator(self.CRC_POLYNOMIAL)
-        self.app_logger = getLogger('application.message_parser')
+        self.app_logger = getLogger('application.communication')
         super().__init__()
 
     def parse_incoming_message(self, data):
@@ -42,7 +42,7 @@ class MessageParser:
         return data
 
     def pack_request(self, count, address, sub_address):
-        data = bytearray(10)
+        data = bytearray(6)
         data[0] = 0xFF
         data[1] = self.REQUEST_MESSAGE
         data[2] = count
