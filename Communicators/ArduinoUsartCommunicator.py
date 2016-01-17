@@ -42,7 +42,7 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
 
     def get_incoming_message(self):
         msg = self.__input_message_queue.get()
-        self.app_logger.info('Message read from queue')
+        self.app_logger.debug('Message read from queue')
         self.app_logger.debug('Type: %s' % msg['type'])
         self.__input_message_queue.task_done()
         return msg
@@ -58,6 +58,7 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
                 self.app_logger.debug('Command applied successfully')
 
         self.__command_counter += 1
+        self.__current_log_message %= 256
 
     def __start_reading(self):
         self.__is_reading = True
@@ -90,13 +91,14 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
                         msg_size = 0
 
         except SerialException as e:
-            print('Error reading serial port:')
-            print(e.strerror)
+            self.app_logger.fatal('Error reading serial port:')
+            self.app_logger.fatal(e.strerror)
 
     def __process_message(self, message):
         self.app_logger.debug('Processing incoming message.')
         assert(type(message) is bytearray)
         parsed_msg = dict(type='unknown')
+
         try:
             parsed_msg = self.__parser.parse_incoming_message(message)
         except AssertionError as ae:
