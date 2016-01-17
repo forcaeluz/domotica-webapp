@@ -1,4 +1,4 @@
-
+from binascii import hexlify
 from logging import getLogger
 from logging.config import dictConfig
 from threading import Thread
@@ -58,7 +58,19 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
                 self.app_logger.debug('Command applied successfully')
 
         self.__command_counter += 1
-        self.__current_log_message %= 256
+        self.__command_counter %= 256
+
+    def send_request(self, address, sub_address):
+        content = self.__parser.pack_request(self.__command_counter, address, sub_address)
+        self.app_logger.debug('Writing request to arduino')
+        self.app_logger.debug(hexlify(content))
+        self.serial_port.write(content)
+        msg = self.get_incoming_message()
+        if msg['id'] == self.__command_counter:
+            self.app_logger.debug('Request replied successfully')
+            print('Arduino replied with: %s' % msg['data'])
+        self.__command_counter += 1
+        self.__command_counter %= 256
 
     def __start_reading(self):
         self.__is_reading = True
@@ -103,10 +115,14 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
             parsed_msg = self.__parser.parse_incoming_message(message)
         except AssertionError as ae:
             self.app_logger.error('Invalid incoming message with error ' + ae.args[0])
+            self.app_logger.error('Data: %s' % hexlify(message))
             self.serial_port.flush()
 
         if parsed_msg['type'] == 'string':
             self.__arduino_logger.process_log_message(parsed_msg)
+        elif parsed_msg['type'] == 'error':
+            self.app_logger.warning('Arduino replied with error message')
+            self.app_logger.warning('Data: %s' % hexlify(message))
         else:
             self.app_logger.debug('Message put in queue')
             self.app_logger.debug('Type: %s' % parsed_msg['type'])
@@ -126,20 +142,23 @@ if __name__ == '__main__':
     communicator.send_command(0x10, 0x02, 0)
     communicator.send_command(0x11, 0x02, 0)
     communicator.send_command(0x12, 0x02, 0)
+    communicator.send_command(0x13, 0x02, 1)
 
     communicator.send_command(0x10, 0x00, 0)
     communicator.send_command(0x11, 0x00, 0)
     communicator.send_command(0x12, 0x00, 1)
+    communicator.send_request(0x13, 0x00)
     while True:
-        sleep(10)
+        sleep(3)
         communicator.send_command(0x10, 0x00, 1)
         communicator.send_command(0x11, 0x00, 0)
         communicator.send_command(0x12, 0x00, 0)
-        sleep(10)
+        communicator.send_request(0x13, 0x00)
+        sleep(3)
         communicator.send_command(0x10, 0x00, 0)
         communicator.send_command(0x11, 0x00, 1)
         communicator.send_command(0x12, 0x00, 0)
-        sleep(2)
+        sleep(1)
         communicator.send_command(0x10, 0x00, 0)
         communicator.send_command(0x11, 0x00, 0)
         communicator.send_command(0x12, 0x00, 1)
