@@ -1,8 +1,8 @@
-from Devices.IInput import IInput
-from Hardware.IArduinoCommunicator import IArduinoCommunicator
+from Communicators.IArduinoCommunicator import IArduinoCommunicator
+from Devices.IDigitalInput import IDigitalInput
 
 
-class ArduinoDigitalInput(IInput):
+class ArduinoDigitalInput(IDigitalInput):
 
     def __init__(self, name, port, address, communicator=None):
         """
@@ -27,7 +27,7 @@ class ArduinoDigitalInput(IInput):
     def get_value(self):
         address = self.__register_address
         sub_address = self.__SUB_ADDRESSES['DATA']
-        self.__value = self.__communicator.request_data(address, sub_address)
+        self.__value = self.__communicator.request_object_data(address, sub_address)
         return self.__value
 
     def get_type(self):
@@ -39,7 +39,7 @@ class ArduinoDigitalInput(IInput):
         address = self.__register_address
         sub_address = self.__SUB_ADDRESSES['PULL_UP_ENABLED']
         data = 1
-        self.__communicator.send_command(address, sub_address, data)
+        self.__communicator.write_to_object(address, sub_address, data)
 
     def disable_pullup(self):
         assert not self.__enabled, 'Cannot disable pull-up during operation'
@@ -47,20 +47,20 @@ class ArduinoDigitalInput(IInput):
         address = self.__register_address
         sub_address = self.__SUB_ADDRESSES['PULL_UP_ENABLED']
         data = 0
-        self.__communicator.send_command(address, sub_address, data)
+        self.__communicator.write_to_object(address, sub_address, data)
 
     def enable(self):
         address = self.__register_address
         sub_address = self.__SUB_ADDRESSES['ENABLED']
         data = 1
-        self.__communicator.send_command(address, sub_address, data)
+        self.__communicator.write_to_object(address, sub_address, data)
         self.__enabled = True
 
     def disable(self):
         address = self.__register_address
         sub_address = self.__SUB_ADDRESSES['ENABLED']
         data = 0
-        self.__communicator.send_command(address, sub_address, data)
+        self.__communicator.write_to_object(address, sub_address, data)
         self.__enabled = False
 
     def is_enabled(self):

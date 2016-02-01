@@ -13,62 +13,60 @@ from Utilities.ArduinoLogger import ArduinoLogger
 from log_config import LOGGING
 
 
-class ArduinoUsartCommunicator(IArduinoCommunicator):
+class ArduinoSerialCommunicator(IArduinoCommunicator):
+    """
 
-    CRC_POLYNOMIAL = 0x97
-
+    """
     def __init__(self):
-        self.__setup_logging()
+        """
+
+        """
+        CRC_POLYNOMIAL = 0x97
+        self.app_logger = getLogger('application.usart_communication')
+        self.app_logger.info('Creating serial communicator')
         self.__parser = MessageParser()
         self.__arduino_logger = ArduinoLogger()
-        self.serial_port = Serial()
-        self.__crc_calculator = Crc8Calculator(self.CRC_POLYNOMIAL)
+        self.__serial_port = Serial()
+        self.__crc_calculator = Crc8Calculator(CRC_POLYNOMIAL)
         self.__receiver_thread = Thread(target=self.__read_incoming_message)
         self.__is_reading = False
-        self.__log_buffer = bytearray()
-        self.__current_log_message = 0
+        self.__request_queue = Queue()
+        self.__command_queue = Queue()
+        self.__request_counter = 0
         self.__command_counter = 0
         self.__input_message_queue = Queue()
 
+    def request_object_data(self, address, sub_address):
+        content = self.__parser.pack_request(self.__command_counter, address, sub_address)
+        self.app_logger.debug('Writing request to arduino: %s', hexlify(content))
+        self.__serial_port.write(content)
+        msg = self.__get_incoming_message()
+        if msg['id'] == self.__command_counter:
+            self.app_logger.debug('Request replied successfully')
+            print('Arduino replied with: %s' % msg['data'])
+        self.__request_counter += 1
+        self.__request_counter %= 256
+
     def open(self, port_name):
-        self.serial_port.port = port_name
-        self.serial_port.baudrate = 57600
-        self.serial_port.open()
+        self.__serial_port.port = port_name
+        self.__serial_port.baudrate = 57600
+        self.__serial_port.open()
         self.__start_reading()
 
     def close(self):
         self.__stop_reading()
-        self.serial_port.close()
+        self.__serial_port.close()
 
-    def get_incoming_message(self):
-        msg = self.__input_message_queue.get()
-        self.app_logger.debug('Message read from queue')
-        self.app_logger.debug('Type: %s' % msg['type'])
-        self.__input_message_queue.task_done()
-        return msg
-
-    def send_command(self, address, sub_address, data):
+    def write_to_object(self, address, sub_address, data):
         content = self.__parser.pack_command(self.__command_counter, address, sub_address, data)
         self.app_logger.debug('Writing command to arduino')
         self.app_logger.debug(content)
-        self.serial_port.write(content)
-        msg = self.get_incoming_message()
+        self.__serial_port.write(content)
+        msg = self.__get_incoming_message()
         if msg['id'] == self.__command_counter:
             if msg['data'] == 1:
                 self.app_logger.debug('Command applied successfully')
 
-        self.__command_counter += 1
-        self.__command_counter %= 256
-
-    def send_request(self, address, sub_address):
-        content = self.__parser.pack_request(self.__command_counter, address, sub_address)
-        self.app_logger.debug('Writing request to arduino')
-        self.app_logger.debug(hexlify(content))
-        self.serial_port.write(content)
-        msg = self.get_incoming_message()
-        if msg['id'] == self.__command_counter:
-            self.app_logger.debug('Request replied successfully')
-            print('Arduino replied with: %s' % msg['data'])
         self.__command_counter += 1
         self.__command_counter %= 256
 
@@ -86,7 +84,7 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
         msg_size = 0
         try:
             while self.__is_reading:
-                data = ord(self.serial_port.read(1))
+                data = ord(self.__serial_port.read(1))
 
                 # First byte condition
                 if data == 0xFF and len(incoming_message) == 0:
@@ -116,7 +114,7 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
         except AssertionError as ae:
             self.app_logger.error('Invalid incoming message with error ' + ae.args[0])
             self.app_logger.error('Data: %s' % hexlify(message))
-            self.serial_port.flush()
+            self.__serial_port.flush()
 
         if parsed_msg['type'] == 'string':
             self.__arduino_logger.process_log_message(parsed_msg)
@@ -128,39 +126,41 @@ class ArduinoUsartCommunicator(IArduinoCommunicator):
             self.app_logger.debug('Type: %s' % parsed_msg['type'])
             self.__input_message_queue.put(parsed_msg)
 
-    def __setup_logging(self):
-        self.app_logger = getLogger('application.usart_communication')
+    def __get_incoming_message(self):
+        msg = self.__input_message_queue.get()
+        self.app_logger.debug('Message read from queue')
+        self.app_logger.debug('Type: %s' % msg['type'])
+        self.__input_message_queue.task_done()
+        return msg
 
-"""
-The main function allows to use this communicator class as a stand-alone.
-This can be useful for testing the implementation of the code on the arduino.
-"""
 if __name__ == '__main__':
+    """
+    The main function allows to use this communicator class as a stand-alone.
+    This can be useful for testing the implementation of the code on the arduino.
+    """
     dictConfig(LOGGING)
-    communicator = ArduinoUsartCommunicator()
+    communicator = ArduinoSerialCommunicator()
     communicator.open('/dev/ttyUSB0')
-    communicator.send_command(0x10, 0x02, 0)
-    communicator.send_command(0x11, 0x02, 0)
-    communicator.send_command(0x12, 0x02, 0)
-    communicator.send_command(0x13, 0x02, 1)
+    communicator.write_to_object(0x10, 0x02, 0)
+    communicator.write_to_object(0x11, 0x02, 0)
+    communicator.write_to_object(0x12, 0x02, 0)
+    communicator.write_to_object(0x13, 0x02, 1)
 
-    communicator.send_command(0x10, 0x00, 0)
-    communicator.send_command(0x11, 0x00, 0)
-    communicator.send_command(0x12, 0x00, 1)
-    communicator.send_request(0x13, 0x00)
+    communicator.write_to_object(0x10, 0x00, 0)
+    communicator.write_to_object(0x11, 0x00, 0)
+    communicator.write_to_object(0x12, 0x00, 1)
     while True:
         sleep(3)
-        communicator.send_command(0x10, 0x00, 1)
-        communicator.send_command(0x11, 0x00, 0)
-        communicator.send_command(0x12, 0x00, 0)
-        communicator.send_request(0x13, 0x00)
+        communicator.write_to_object(0x10, 0x00, 1)
+        communicator.write_to_object(0x11, 0x00, 0)
+        communicator.write_to_object(0x12, 0x00, 0)
         sleep(3)
-        communicator.send_command(0x10, 0x00, 0)
-        communicator.send_command(0x11, 0x00, 1)
-        communicator.send_command(0x12, 0x00, 0)
+        communicator.write_to_object(0x10, 0x00, 0)
+        communicator.write_to_object(0x11, 0x00, 1)
+        communicator.write_to_object(0x12, 0x00, 0)
         sleep(1)
-        communicator.send_command(0x10, 0x00, 0)
-        communicator.send_command(0x11, 0x00, 0)
-        communicator.send_command(0x12, 0x00, 1)
+        communicator.write_to_object(0x10, 0x00, 0)
+        communicator.write_to_object(0x11, 0x00, 0)
+        communicator.write_to_object(0x12, 0x00, 1)
 
         # communicator.get_incoming_message()

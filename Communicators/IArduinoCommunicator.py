@@ -41,3 +41,25 @@ class IArduinoCommunicator:
         :param observer:
         """
         pass
+
+
+class ArduinoCommunicationError(Exception):
+    """
+
+    """
+    def __init__(self, message):
+        self.message = message
+
+    def __str__(self):
+        return repr(self.message)
+
+
+class ArduinoRepliedError(Exception):
+    """
+
+    """
+    def __init__(self, address, sub_address, value, error):
+        self.address = address
+        self.sub_address = sub_address
+        self.value = value
+        self.error = error

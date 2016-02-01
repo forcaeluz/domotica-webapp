@@ -8,7 +8,7 @@ class ArduinoLogger:
         handler = self.__arduino_logger.handlers[0]
         assert isinstance(handler, RotatingFileHandler)
         handler.doRollover()
-        self.__app_logger = getLogger('application.usart_communication')
+        self.__app_logger = getLogger('application.communication')
         self.__log_buffer = bytearray()
         self.__current_log_message = 0
 
